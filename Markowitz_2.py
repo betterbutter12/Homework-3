@@ -46,20 +46,18 @@ class MyPortfolio:
         self.price = price.dropna()  # Ensure no missing data
         self.returns = price.pct_change().fillna(0)
         self.exclude = exclude
-        self.lookback = lookback  # Window for volatility calculation
+        self.lookback = lookback  
         self.momentum_window = momentum_window  # Window for momentum calculation
         self.momentum_weight = momentum_weight  # Weight for momentum in final weights
 
     def calculate_weights(self):
-        # Get the assets by excluding the specified column
+
         assets = self.price.columns[self.price.columns != self.exclude]
 
-        # Calculate the portfolio weights
         self.portfolio_weights = pd.DataFrame(
             index=self.price.index, columns=self.price.columns
         )
 
-        # Initialize weights with equal weights for the first lookback days
         num_assets = len(assets)
         equal_weight = 1.0 / num_assets
         for i in range(max(self.lookback, self.momentum_window)):
@@ -67,27 +65,22 @@ class MyPortfolio:
                 self.portfolio_weights.loc[self.price.index[i], assets] = equal_weight
                 self.portfolio_weights.loc[self.price.index[i], self.exclude] = 0
 
-        # Momentum-enhanced risk parity weights for subsequent days
         for i in range(max(self.lookback, self.momentum_window), len(self.price)):
-            # Calculate risk parity weights
             returns_window = self.returns[assets].iloc[i - self.lookback:i]
-            volatilities = returns_window.std() * np.sqrt(252)  # Annualized volatility
-            volatilities = volatilities.clip(lower=1e-6)  # Prevent division by zero
+            volatilities = returns_window.std() * np.sqrt(252)  
+            volatilities = volatilities.clip(lower=1e-6)  
             inv_vol = 1.0 / volatilities
             rp_weights = inv_vol / inv_vol.sum()
 
-            # Calculate momentum scores
             momentum_window = self.returns[assets].iloc[i - self.momentum_window:i]
-            momentum_scores = momentum_window.mean() * 252  # Annualized returns as momentum
+            momentum_scores = momentum_window.mean() * 252  
             momentum_scores = (momentum_scores - momentum_scores.min()) / \
-                             (momentum_scores.max() - momentum_scores.min() + 1e-6)  # Normalize to [0,1]
+                             (momentum_scores.max() - momentum_scores.min() + 1e-6)  
             momentum_weights = momentum_scores / momentum_scores.sum()
 
-            # Combine risk parity and momentum weights
             weights = (1 - self.momentum_weight) * rp_weights + self.momentum_weight * momentum_weights
-            weights = weights / weights.sum()  # Normalize to sum to 1
+            weights = weights / weights.sum()  
 
-            # Assign weights to the corresponding date
             self.portfolio_weights.loc[self.price.index[i], assets] = weights
             self.portfolio_weights.loc[self.price.index[i], self.exclude] = 0
 
@@ -95,11 +88,9 @@ class MyPortfolio:
         self.portfolio_weights.fillna(0, inplace=True)
 
     def calculate_portfolio_returns(self):
-        # Ensure weights are calculated
         if not hasattr(self, "portfolio_weights"):
             self.calculate_weights()
 
-        # Calculate the portfolio returns
         self.portfolio_returns = self.returns.copy()
         assets = self.price.columns[self.price.columns != self.exclude]
         self.portfolio_returns["Portfolio"] = (
@@ -109,7 +100,6 @@ class MyPortfolio:
         )
 
     def get_results(self):
-        # Ensure portfolio returns are calculated
         if not hasattr(self, "portfolio_returns"):
             self.calculate_portfolio_returns()
 
